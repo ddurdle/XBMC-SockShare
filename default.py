@@ -87,7 +87,7 @@ plugin_url = sys.argv[0]
 plugin_handle = int(sys.argv[1])
 plugin_queries = parse_query(sys.argv[2][1:])
 
-addon = xbmcaddon.Addon(id='plugin.video.sockshare')
+addon = xbmcaddon.Addon(id='plugin.video.SockShare')
 
 try:
 
@@ -153,18 +153,18 @@ if mode == 'main' or mode == 'folder':
 
     cacheType = addon.getSetting('playback_type')
 
-    videos = sockshare.getVideosList()
+#    videos = sockshare.getVideosList()
 
 
-    folders = sockshare.getFolderList(folderID)
-    for title in sorted(folders.iterkeys()):
-      addDirectory(folders[title],title)
+#    folders = sockshare.getFolderList(folderID)
+#    for title in sorted(folders.iterkeys()):
+#      addDirectory(folders[title],title)
 
-    videos = sockshare.getVideosList(folderID)
-    for title in sorted(videos.iterkeys()):
-      addVideo(videos[title]['url'],
-                             { 'title' : title , 'plot' : title }, title,
-                             img=videos[title]['thumbnail'])
+#    videos = sockshare.getVideosList(folderID)
+#    for title in sorted(videos.iterkeys()):
+#      addVideo(videos[title]['url'],
+#                             { 'title' : title , 'plot' : title }, title,
+#                             img=videos[title]['thumbnail'])
 
 #play a URL that is passed in (presumely requires authorizated session)
 elif mode == 'play':

@@ -27,7 +27,7 @@ import cookielib
 import xbmc, xbmcaddon, xbmcgui, xbmcplugin
 
 # global variables
-addon = xbmcaddon.Addon(id='plugin.video.sockshare')
+addon = xbmcaddon.Addon(id='plugin.video.SockShare')
 
 # helper methods
 def log(msg, err=False):
@@ -52,6 +52,8 @@ class sockshare:
         self.auth = auth
         self.cookie = cookie
         self.user_agent = user_agent
+        self.cookiejar = cookielib.CookieJar()
+
 
         # if we have an authorization token set, try to use it
         if auth != '':
@@ -89,11 +91,25 @@ class sockshare:
         response.close()
 
         # fetch captcha url
-        for r in re.finditer('<td>(CAPTCHA)</td><td><img src="([^\"]+)"/><br>',
+        for r in re.finditer('<td>(CAPTCHA)</td>.*?<td><img src="([^\"]+)\"',
                              response_data, re.DOTALL):
             ceptchaType,captchaURL = r.groups()
 
-        img = xbmcgui.ControlImage(450,15,400,130, captchaURL)
+        url = 'http://www.sockshare.com' + captchaURL
+
+        try:
+            response = opener.open(url)
+        except urllib2.URLError, e:
+                log(str(e), True)
+
+        output = open('/tmp/test.png','wb')
+        output.write(response.read())
+        output.close()
+        response.close()
+
+
+
+        img = xbmcgui.ControlImage(450,15,400,130,  '/tmp/test.png')
         wdlg = xbmcgui.WindowDialog()
         wdlg.addControl(img)
         wdlg.show()
@@ -115,13 +131,14 @@ class sockshare:
         wdlg.close()
 
 
-        url = self.protocol + self.domain + '/'
+        url = 'http://www.sockshare.com/authenticate.php?login'
 
         values = {
-                  'password' : self.password,
+                  'pass' : self.password,
                   'user' : self.user,
-                  'remember_login' : 1,
-                  'timezone-offset' : -4,
+                  'remember' : 1,
+                  'captcha_code' : solution,
+                  'login_submit' : 'Login',
         }
 
         log('logging in')
@@ -142,7 +159,7 @@ class sockshare:
 
         loginResult = 0
         #validate successful login
-        for r in re.finditer('(data-user)\=\"([^\"]+)\"',
+        for r in re.finditer('class="(header-right-auth)"><strong>([^\<]+)</strong>',
                              response_data, re.DOTALL):
             loginType,loginResult = r.groups()
 
@@ -155,10 +172,8 @@ class sockshare:
             for r in re.finditer(' ([^\=]+)\=([^\s]+)\s',
                         str(cookie), re.DOTALL):
                 cookieType,cookieValue = r.groups()
-                if cookieType == 'oc_token':
+                if cookieType == 'auth':
                     self.auth = cookieValue
-                elif cookieType != 'oc_remember_login' and cookieType != 'oc_username':
-                    self.session = cookieType + '=' + cookieValue
 
 
         return
