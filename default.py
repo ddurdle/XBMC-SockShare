@@ -87,7 +87,7 @@ plugin_url = sys.argv[0]
 plugin_handle = int(sys.argv[1])
 plugin_queries = parse_query(sys.argv[2][1:])
 
-addon = xbmcaddon.Addon(id='plugin.video.SockShare')
+addon = xbmcaddon.Addon(id='plugin.video.sockshare')
 
 try:
 
@@ -112,7 +112,6 @@ except :
 username = addon.getSetting('username')
 password = addon.getSetting('password')
 auth_token = addon.getSetting('auth_token')
-auth_cookie = addon.getSetting('auth_cookie')
 user_agent = addon.getSetting('user_agent')
 save_auth_token = addon.getSetting('save_auth_token')
 
@@ -125,13 +124,12 @@ if ((username == '' or password == '') and auth_token == ''):
 
 
 #let's log in
-sockshare = sockshare.sockshare(username, password, auth_token, auth_cookie, user_agent)
+sockshare = sockshare.sockshare(username, password, auth_token, user_agent)
 
 # if we don't have an authorization token set for the plugin, set it with the recent login.
 #   auth_token will permit "quicker" login in future executions by reusing the existing login session (less HTTPS calls = quicker video transitions between clips)
 if auth_token == '' and save_auth_token == 'true':
     addon.setSetting('auth_token', sockshare.auth)
-    addon.setSetting('auth_cookie', sockshare.cookie)
 
 
 
@@ -145,61 +143,38 @@ mode = plugin_queries['mode']
 if mode == 'main' or mode == 'folder':
     log(mode)
 
+    cacheType = addon.getSetting('playback_type')
+
     folderID=0
     if (mode == 'folder'):
-        folderID = plugin_queries['folderID']
-
-
-
-    cacheType = addon.getSetting('playback_type')
-
-#    videos = sockshare.getVideosList()
-
-
-#    folders = sockshare.getFolderList(folderID)
-#    for title in sorted(folders.iterkeys()):
-#      addDirectory(folders[title],title)
-
-#    videos = sockshare.getVideosList(folderID)
-#    for title in sorted(videos.iterkeys()):
-#      addVideo(videos[title]['url'],
-#                             { 'title' : title , 'plot' : title }, title,
-#                             img=videos[title]['thumbnail'])
-
-#play a URL that is passed in (presumely requires authorizated session)
-elif mode == 'play':
-    url = plugin_queries['url']
-
-    item = xbmcgui.ListItem(path=url)
-    log('play url: ' + url)
-    xbmcplugin.setResolvedUrl(int(sys.argv[1]), True, item)
-
-#play a video given its exact-title
-elif mode == 'playvideo' or mode == 'playVideo':
-    title = plugin_queries['title']
-    cacheType = addon.getSetting('playback_type')
-
-    if cacheType == '0':
-      videoURL = sockshare.getVideoLink(title)
+        folderID = plugin_queries['foldername']
+        videos = sockshare.getVideosList(folderID=folderID)
     else:
-      videoURL = sockshare.getVideoLink(title,True,cacheType)
+        videos = sockshare.getVideosList()
 
-    item = xbmcgui.ListItem(path=videoURL)
-    log('play url: ' + videoURL)
-    xbmcplugin.setResolvedUrl(int(sys.argv[1]), True, item)
 
+    for title in sorted(videos.iterkeys()):
+        if videos[title]['mediaType'] == sockshare.MEDIA_TYPE_VIDEO:
+            addVideo(videos[title]['url'],
+                             { 'title' : title , 'plot' : title }, title)
+
+        elif videos[title]['mediaType'] == sockshare.MEDIA_TYPE_MUSIC:
+            addVideo(videos[title]['url'],
+                             { 'title' : title , 'plot' : title }, title)
+        else :
+            addDirectory(videos[title]['url'],title)
 
 
 #force stream - play a video given its exact-title
 elif mode == 'streamVideo' or mode == 'streamvideo':
     try:
-      filename = plugin_queries['filename']
+      fileID = plugin_queries['filename']
     except:
-      title = 0
+      fileID = ''
 
 
     # immediately play resulting (is a video)
-    videoURL = sockshare.getVideoLink(filename)
+    videoURL = sockshare.getVideoLink(fileID)
     item = xbmcgui.ListItem(path=videoURL)
     log('play url: ' + videoURL)
     xbmcplugin.setResolvedUrl(int(sys.argv[1]), True, item)
@@ -212,7 +187,7 @@ elif mode == 'streamURL' or mode == 'streamurl':
 
 
     # immediately play resulting (is a video)
-    videoURL = sockshare.getPublicLink(url)
+    videoURL = sockshare.getVideoLink(url=url)
     item = xbmcgui.ListItem(path=videoURL)
     log('play url: ' + videoURL)
     xbmcplugin.setResolvedUrl(int(sys.argv[1]), True, item)
@@ -222,14 +197,12 @@ elif mode == 'streamURL' or mode == 'streamurl':
 #clear the authorization token
 elif mode == 'clearauth':
     addon.setSetting('auth_token', '')
-    addon.setSetting('auth_cookie', '')
 
 
 
 # update the authorization token in the configuration file if we had to login for a new one during this execution run
 if auth_token != sockshare.auth and save_auth_token == 'true':
     addon.setSetting('auth_token', sockshare.auth)
-    addon.setSetting('auth_cookie', sockshare.cookie)
 
 
 xbmcplugin.endOfDirectory(plugin_handle)
