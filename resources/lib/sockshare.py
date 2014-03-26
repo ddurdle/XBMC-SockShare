@@ -47,6 +47,9 @@ class sockshare:
     MEDIA_TYPE_VIDEO = 2
     MEDIA_TYPE_FOLDER = 0
 
+    CACHE_TYPE_MEMORY = 0
+    CACHE_TYPE_DISK = 1
+    CACHE_TYPE_STREAM = 2
 
     ##
     # initialize (setting 1) username, 2) password, 3) authorization token, 4) user agent string
@@ -105,21 +108,28 @@ class sockshare:
         except urllib2.URLError, e:
                 log(str(e), True)
 
-        output = open('/tmp/test.png','wb')
+        captchaFile = xbmc.translatePath(os.path.join('special://profile/addon_data/plugin.video.sockshare', 'captcha.png'))
+
+        try:
+            os.remove(captchaFile)
+        except:
+            pass
+
+
+        output = open(captchaFile,'wb')
         output.write(response.read())
         output.close()
         response.close()
 
 
-
-        img = xbmcgui.ControlImage(450,15,400,130,  '/tmp/test.png')
+        img = xbmcgui.ControlImage(450,15,400,130,captchaFile)
         wdlg = xbmcgui.WindowDialog()
         wdlg.addControl(img)
         wdlg.show()
 
         xbmc.sleep(3000)
 
-        kb = xbmc.Keyboard('', 'Type the letters in the image', False)
+        kb = xbmc.Keyboard('', addon.getLocalizedString(30012), False)
         kb.doModal()
         capcode = kb.getText()
 
@@ -128,11 +138,15 @@ class sockshare:
            if userInput != '':
                solution = kb.getText()
            elif userInput == '':
-               raise Exception ('You must enter text in the image to access video')
+               raise Exception (addon.getLocalizedString(30011))
         else:
            raise Exception ('Captcha Error')
         wdlg.close()
 
+        try:
+            os.remove(captchaFile)
+        except:
+            pass
 
         url = 'http://www.sockshare.com/authenticate.php?login'
 
@@ -250,7 +264,8 @@ class sockshare:
                 log('found video %s %s' % (title, fileID))
 
                 # streaming
-                videos[title] = {'mediaType' : self.MEDIA_TYPE_VIDEO, 'url': 'plugin://plugin.video.SockShare?mode=streamVideo&filename=' + fileID, 'thumbnail' : None}
+                videos[title] = {'mediaType' : self.MEDIA_TYPE_VIDEO, 'url': 'plugin://plugin.video.sockshare?mode=streamVideo&filename=' + fileID, 'thumbnail' : None}
+
 
             for r in re.finditer('<a href="\/cp.php\?folder=([^\"]+)" class="folder_link">([^\<]+)</a>' ,
                                  response_data, re.DOTALL):
@@ -258,7 +273,7 @@ class sockshare:
 
                 log('found folder %s %s' % (folderID, folderName))
 
-                videos[folderName] = {'mediaType' : self.MEDIA_TYPE_FOLDER, 'url': 'plugin://plugin.video.SockShare?mode=folder&foldername=' + folderID, 'thumbnail' : None}
+                videos[folderName] = {'mediaType' : self.MEDIA_TYPE_FOLDER, 'url': 'plugin://plugin.video.sockshare?mode=folder&foldername=' + folderID, 'thumbnail' : None}
 
 
         return videos
@@ -332,122 +347,73 @@ class sockshare:
         response.close()
 
         streamURL = ''
-        # retrieve request hash
-        for r in re.finditer('(playlist): \'([^\']+)' ,
+
+
+        # video stream
+        if cacheType == self.CACHE_TYPE_STREAM:
+
+          for r in re.finditer('(playlist): \'([^\']+)' ,
                                  response_data, re.DOTALL):
             streamType,streamURL = r.groups()
 
-            log('found video %s' % (streamURL))
+            log('found video stream %s' % (streamURL))
 
             # streaming
             streamURL = 'http://www.sockshare.com/'+ streamURL
 
-        log('url = %s header = %s' % (streamURL, self.getHeadersList()))
-        req = urllib2.Request(streamURL, None, self.getHeadersList())
+            log('url = %s header = %s' % (streamURL, self.getHeadersList()))
+            req = urllib2.Request(streamURL, None, self.getHeadersList())
 
-        # if action fails, validate login
-        try:
-            response = urllib2.urlopen(req)
-        except urllib2.URLError, e:
-            if e.code == 403 or e.code == 401:
-                self.login()
-                req = urllib2.Request(streamURL, None, self.getHeadersList())
-                try:
-                  response = urllib2.urlopen(req)
-                except urllib2.URLError, e:
-                  log(str(e), True)
-                  return
-            else:
-                log(str(e), True)
-                return
+            # if action fails, validate login
+            try:
+                response = urllib2.urlopen(req)
+            except urllib2.URLError, e:
+                if e.code == 403 or e.code == 401:
+                    self.login()
+                    req = urllib2.Request(streamURL, None, self.getHeadersList())
+                    try:
+                        response = urllib2.urlopen(req)
+                    except urllib2.URLError, e:
+                        log(str(e), True)
+                        return
+                else:
+                    log(str(e), True)
+                    return
 
-        response_data = response.read()
-        response.close()
+            response_data = response.read()
+            response.close()
 
-        # retrieve request hash
-        for r in re.finditer('<media:(content) url="([^\"]+)"' ,
+            # retrieve request hash
+            for r in re.finditer('<media:(content) url="([^\"]+)"' ,
+                                 response_data, re.DOTALL):
+                streamType,streamURL = r.groups()
+
+            streamURL = re.sub('&amp;', '&', streamURL)
+            return streamURL + '|'+self.getHeadersEncoded()
+        else:
+          for r in re.finditer('href="([^\"]+)" class="(download_file_link)"' ,
+                                 response_data, re.DOTALL):
+            streamURL,streamType = r.groups()
+
+            log('found video download %s' % (streamURL))
+
+            # streaming
+            streamURL = 'http://www.sockshare.com/'+ streamURL
+
+
+        # audio download
+        for r in re.finditer('"(setFile)", "([^\"]+)"' ,
                                  response_data, re.DOTALL):
             streamType,streamURL = r.groups()
 
-        streamURL = re.sub('&amp;', '&', streamURL)
+            log('found audio %s' % (streamURL))
+
+            # streaming
+            streamURL = 'http://www.sockshare.com/'+ streamURL
+
         return streamURL + '|'+self.getHeadersEncoded()
 
 
-    ##
-    # retrieve a video link
-    #   parameters: title of video, whether to prompt for quality/format (optional), cache type (optional)
-    #   returns: list of URLs for the video or single URL of video (if not prompting for quality)
-    ##
-    def getPublicLink(self,url,cacheType=0):
-
-
-        log('url = %s header = %s' % (url, self.getHeadersList()))
-        req = urllib2.Request(url, None, self.getHeadersList())
-
-
-        # if action fails, validate login
-        try:
-            response = urllib2.urlopen(req)
-        except urllib2.URLError, e:
-            if e.code == 403 or e.code == 401:
-              self.login()
-              req = urllib2.Request(url, None, self.getHeadersList())
-              try:
-                response = urllib2.urlopen(req)
-              except urllib2.URLError, e:
-                log(str(e), True)
-                return
-            else:
-              log(str(e), True)
-              return
-
-        response_data = response.read()
-
-        confirmID = 0
-        # fetch video title, download URL and docid for stream link
-        for r in re.finditer('name\=\"(confirm)\" value\=\"([^\"]+)"\/\>' ,response_data, re.DOTALL):
-             confirmType,confirmID = r.groups()
-
-        response.close()
-
-        if confirmID == 0:
-            return
-
-        values = {
-                  'confirm' : confirmID,
-        }
-
-        req = urllib2.Request(url, urllib.urlencode(values), self.getHeadersList())
-
-
-        # if action fails, validate login
-        try:
-            response = urllib2.urlopen(req)
-        except urllib2.URLError, e:
-            if e.code == 403 or e.code == 401:
-              self.login()
-              req = urllib2.Request(url,  urllib.urlencode(values), self.getHeadersList())
-              try:
-                response = urllib2.urlopen(req)
-              except urllib2.URLError, e:
-                log(str(e), True)
-                return
-            else:
-              log(str(e), True)
-              return
-
-        response_data = response.read()
-
-        streamURL = 0
-        # fetch video title, download URL and docid for stream link
-        for r in re.finditer('(file)\: \'([^\']+)' ,response_data, re.DOTALL):
-             streamType,streamURL = r.groups()
-
-
-        response.close()
-
-
-        return streamURL
 
 
 

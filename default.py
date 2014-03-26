@@ -22,6 +22,7 @@ import urllib
 import cgi
 import re
 
+
 import xbmc, xbmcgui, xbmcplugin, xbmcaddon
 
 
@@ -80,6 +81,12 @@ def decode_dict(data):
             data[k] = decode(v)
     return data
 
+addon = xbmcaddon.Addon(id='plugin.video.sockshare')
+
+if sys.argv[1] == 'clearauth':
+    addon.setSetting('auth_token', '')
+    xbmcgui.Dialog().ok(addon.getLocalizedString(30000), addon.getLocalizedString(30014))
+    sys.exit(1)
 
 
 #global variables
@@ -87,7 +94,6 @@ plugin_url = sys.argv[0]
 plugin_handle = int(sys.argv[1])
 plugin_queries = parse_query(sys.argv[2][1:])
 
-addon = xbmcaddon.Addon(id='plugin.video.sockshare')
 
 try:
 
@@ -139,11 +145,14 @@ log('plugin handle: ' + str(plugin_handle))
 
 mode = plugin_queries['mode']
 
+# make mode case-insensitive
+mode = mode.lower()
+
 #dump a list of videos available to play
 if mode == 'main' or mode == 'folder':
     log(mode)
 
-    cacheType = addon.getSetting('playback_type')
+#    cacheType = addon.getSetting('playback_type')
 
     folderID=0
     if (mode == 'folder'):
@@ -166,20 +175,22 @@ if mode == 'main' or mode == 'folder':
 
 
 #force stream - play a video given its exact-title
-elif mode == 'streamVideo' or mode == 'streamvideo':
+elif mode == 'streamvideo':
     try:
       fileID = plugin_queries['filename']
     except:
       fileID = ''
 
+    cacheType = addon.getSetting('playback_type')
+
 
     # immediately play resulting (is a video)
-    videoURL = sockshare.getVideoLink(fileID)
+    videoURL = sockshare.getVideoLink(fileID,cacheType=cacheType)
     item = xbmcgui.ListItem(path=videoURL)
     log('play url: ' + videoURL)
     xbmcplugin.setResolvedUrl(int(sys.argv[1]), True, item)
 
-elif mode == 'streamURL' or mode == 'streamurl':
+elif mode == 'streamurl':
     try:
       url = plugin_queries['url']
     except:
@@ -187,7 +198,7 @@ elif mode == 'streamURL' or mode == 'streamurl':
 
 
     # immediately play resulting (is a video)
-    videoURL = sockshare.getVideoLink(url=url)
+    videoURL = sockshare.getVideoLink(url=url,cacheType=cacheType)
     item = xbmcgui.ListItem(path=videoURL)
     log('play url: ' + videoURL)
     xbmcplugin.setResolvedUrl(int(sys.argv[1]), True, item)
