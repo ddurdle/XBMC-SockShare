@@ -286,6 +286,8 @@ class sockshare:
     ##
     def getVideoLink(self,fileID='',url='',cacheType=0):
 
+        cacheType = (int)(cacheType)
+
         if fileID != '':
             url = 'http://www.sockshare.com/file/'+ fileID
 
