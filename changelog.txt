@@ -1,5 +1,6 @@
 Version 0.0.4
 - fix for premium user playback
+- issue fix: Error Streaming #1
 Version 0.0.3
 - cast fix
 Version 0.0.2
