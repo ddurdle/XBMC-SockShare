@@ -1,3 +1,5 @@
+Version 0.0.4
+- fix for premium user playback
 Version 0.0.3
 - cast fix
 Version 0.0.2

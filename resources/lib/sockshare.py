@@ -315,38 +315,42 @@ class sockshare:
         response.close()
 
 
+        hashValue = ''
         # retrieve request hash
         for r in re.finditer('<input type="hidden" value="([^\"]+)" name="(hash)">' ,
                                  response_data, re.DOTALL):
             hashValue,hashType = r.groups()
 
+        #for premium users, there is no 'Please wait' message
+        if hashValue != '':
 
-        values = {
+            values = {
                   'hash' : hashValue,
                   'confirm' : 'Please wait for 0 seconds',
-        }
+            }
 
-        log('url = %s header = %s' % (url, self.getHeadersList()))
-        req = urllib2.Request(url, urllib.urlencode(values), self.getHeadersList())
+            log('url = %s header = %s' % (url, self.getHeadersList()))
+            req = urllib2.Request(url, urllib.urlencode(values), self.getHeadersList())
 
-        # if action fails, validate login
-        try:
-            response = urllib2.urlopen(req)
-        except urllib2.URLError, e:
-            if e.code == 403 or e.code == 401:
-                self.login()
-                req = urllib2.Request(url, urllib.urlencode(values), self.getHeadersList())
-                try:
-                  response = urllib2.urlopen(req)
-                except urllib2.URLError, e:
-                  log(str(e), True)
-                  return
-            else:
-                log(str(e), True)
-                return
+            # if action fails, validate login
+            try:
+                response = urllib2.urlopen(req)
+            except urllib2.URLError, e:
+                if e.code == 403 or e.code == 401:
+                    self.login()
+                    req = urllib2.Request(url, urllib.urlencode(values), self.getHeadersList())
+                    try:
+                        response = urllib2.urlopen(req)
+                    except urllib2.URLError, e:
+                        log(str(e), True)
+                    return
+                else:
+                    log(str(e), True)
+                    return
 
-        response_data = response.read()
-        response.close()
+            response_data = response.read()
+            response.close()
+
 
         streamURL = ''
 
